@@ -1,0 +1,14 @@
+{
+   "description": "displaytool is a tool that allows you to draw shapes on fonts on a display.",
+   "github": "https://github.com/StratifyLabs/displaytool",
+   "name": "displaytool",
+   "permissions": "public",
+   "publisher": "Stratify Labs, Inc",
+   "tags": "tool",
+   "type": "app",
+   "uid": "9cQyOTk3fZXOuMtPyf5j9X4H4b83",
+   "version": "0.7",
+   "hardwareId": "",
+   "ramSize": 0,
+   "timestamp": 1558107358
+}
