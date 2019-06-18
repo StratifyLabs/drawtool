@@ -23,7 +23,6 @@ int main(int argc, char * argv[]){
 
 	Printer printer;
 
-
 	source = cli.get_option("source", "specify the source JSON file to use for drawing");
 	device = cli.get_option("device", "display device (default is /dev/display0)");
 	is_help = cli.get_option("help", "show help");
@@ -55,11 +54,7 @@ int main(int argc, char * argv[]){
 				 display.error_number());
 	}
 
-	display.ioctl(I_DISPLAY_INIT);
-
-
 	if( display.to_void() == 0 ){
-
 		DisplayInfo display_info;
 		display_info = display.get_info();
 		printf("Not enough memory %dx%d %dbpp\n", display_info.width(), display_info.height(), display_info.bits_per_pixel());
@@ -71,11 +66,11 @@ int main(int argc, char * argv[]){
 
 	Timer t;
 
-	display.set_pen_color(0);
+	//display.set_pen_color(0);
 	display.draw_rectangle(Point(0,0), display.area());
 	printer.open_object("display") << display.area() << printer.close();
 
-	display.set_pen_color(15);
+	//display.set_pen_color(15);
 	t.restart();
 	if( draw_scene(source, display, printer) == false){
 		show_usage(cli);
@@ -127,7 +122,6 @@ void show_usage(const Cli & cli){
 
 bool draw_scene(const ConstString & source, Display & display, Printer & printer){
 	JsonDocument document;
-
 	JsonArray array = document.load_from_file(source).to_array();
 
 	if( array.is_empty() ){
@@ -135,20 +129,63 @@ bool draw_scene(const ConstString & source, Display & display, Printer & printer
 	}
 
 	DrawingAttributes drawing_attributes(display, DrawingRegion(DrawingPoint::origin(), DrawingArea::maximum()));
-	BarProgress item;
-	item.set_value(50);
-	item.set_max(100);
-	printer.info("draw panel %p", &drawing_attributes.bitmap());
-	printer.info("attrs %dx%d", drawing_attributes.area().width, drawing_attributes.area().height);
-	drawing_attributes.bitmap().set_pen_color(15);
-	item.draw(drawing_attributes + drawing_point(100,100) + drawing_area(500,100));
 
+	printer.open_object("scene");
+	printer.open_object("region") << drawing_attributes.region() << printer.close();
+
+	drawing_attributes.bitmap().clear();
 	for(u32 i=0; i < array.count(); i++){
 		//render each object
+		JsonObject object = array.at(i).to_object();
+		Timer t;
 
+		//region applies to all object types
+		DrawingRegion region;
+		region << DrawingPoint(object.at("x").to_integer(), object.at("y").to_integer());
+		region << DrawingArea(object.at("width").to_integer(), object.at("height").to_integer());
+		sg_color_t color = object.at("color").to_integer();
+		String class_value = object.at("class").to_string();
+
+		printer.open_object(String().format("[%d]", i));
+		printer.key("class", class_value);
+		printer.open_object("region") << region << printer.close();
+		printer.key("color", "%ld", color);
+
+		if( class_value == "Rectangle" ){
+			t.start();
+			Rectangle().set_color(color).draw(drawing_attributes + region);
+			t.stop();
+		} else if( class_value == "RoundedRectangle" ){
+			u8 radius = object.at("radius").to_integer();
+			printer.key("radius", "%d", radius);
+			t.start();
+			RoundedRectangle().set_radius(radius).set_color(color).draw(drawing_attributes + region);
+			t.stop();
+		} else if( class_value == "BarProgress" ){
+			u16 value = object.at("value").to_integer();
+			u16 maximum = object.at("maximum").to_integer();
+			sg_color_t background_color = object.at("backgroundColor").to_integer();
+			u8 border_thickness = object.at("borderThickness").to_integer();
+			printer.key("value", "%d", value);
+			printer.key("maximum", "%d", maximum);
+			printer.key("backgroundColor", "%d", background_color);
+			printer.key("borderThickness", "%d", border_thickness);
+			t.start();
+			BarProgress()
+					.set_progress(value, maximum)
+					.set_border_thickness(border_thickness)
+					.set_background_color(background_color)
+					.set_color(color)
+					.draw(drawing_attributes + region);
+			t.stop();
+		}
+
+		printer.key("renderMicroseconds", "%ld", t.microseconds());
+		printer.close_object();
 
 	}
 
+	printer.close_object();
 
 	return true;
 

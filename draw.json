@@ -1,0 +1,31 @@
+[{
+  "class": "Rectangle",
+  "x": 100,
+  "y": 100,
+  "width": 500,
+  "height": 500,
+  "color": 15
+},
+{
+  "class": "RoundedRectangle",
+  "x": 600,
+  "y": 600,
+  "width": 250,
+  "height": 250,
+  "color": 3,
+  "radius": 25
+},
+{
+  "class": "BarProgress",
+  "x": 600,
+  "y": 200,
+  "width": 400,
+  "height": 100,
+  "color": 15,
+  "backgroundColor": 7,
+  "value": 25,
+  "maximum": 100,
+  "borderThickness": 25
+}
+
+]
