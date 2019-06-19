@@ -22,7 +22,7 @@
   "width": 400,
   "height": 100,
   "color": 15,
-  "backgroundColor": 7,
+  "backgroundColor": -1,
   "value": 25,
   "maximum": 100,
   "borderThickness": 25
