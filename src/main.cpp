@@ -8,8 +8,8 @@
 #include "sl_config.h"
 
 static void show_usage(const Cli & cli);
-static bool is_memory_ok(const ConstString & application_path, const DisplayDevice & device);
-static bool draw_scene(const ConstString & source, Display & display, Printer & printer);
+static bool is_memory_ok(const String & application_path, const DisplayDevice & device);
+static bool draw_scene(const String & source, Display & display, Printer & printer);
 
 int main(int argc, char * argv[]){
 	Cli cli(argc, argv);
@@ -24,20 +24,20 @@ int main(int argc, char * argv[]){
 	Printer printer;
 
 	source = cli.get_option(
-				arg::OptionName("source"),
-				arg::OptionDescription("specify the source JSON file to use for drawing")
+				("source"),
+				Cli::Description("specify the source JSON file to use for drawing")
 				);
 	device = cli.get_option(
-				arg::OptionName("device"),
-				arg::OptionDescription("display device (default is /dev/display0)")
+				("device"),
+				Cli::Description("display device (default is /dev/display0)")
 				);
 	is_help = cli.get_option(
-				arg::OptionName("help"),
-				arg::OptionDescription("show help")
+				("help"),
+				Cli::Description("show help")
 				);
 	is_stdout = cli.get_option(
-				arg::OptionName("stdout"),
-				arg::OptionDescription("show the output on the standard output")
+				("stdout"),
+				Cli::Description("show the output on the standard output")
 				);
 
 	if( is_help.is_empty() == false ){
@@ -51,7 +51,7 @@ int main(int argc, char * argv[]){
 	}
 
 	if( display.initialize(
-			 arg::SourceFilePath(device)
+			 device
 			 ) < 0 ){
 		printer.error("failed to open the display device");
 		exit(1);
@@ -63,7 +63,7 @@ int main(int argc, char * argv[]){
 	}
 
 	if( display.initialize(
-			 arg::SourceFilePath(device)
+			 device
 			 ) < 0 ){
 		printf("Failed to initialize display (%d, %d)\n",
 				 display.return_value(),
@@ -84,7 +84,7 @@ int main(int argc, char * argv[]){
 
 	//display.set_pen_color(0);
 	display.draw_rectangle(
-				Point(arg::XValue(0),arg::YValue(0)),
+				Point(0,0),
 				display.area()
 				);
 	printer.open_object("display") << display.area() << printer.close();
@@ -102,10 +102,7 @@ int main(int argc, char * argv[]){
 	printer.key("bpp", "%d", display.bits_per_pixel());
 
 	t.restart();
-	display.write(
-				arg::SourceBuffer(display.bmap()),
-				arg::Size(sizeof(sg_bmap_t))
-				);
+	display.write(*display.bmap());
 	t.stop();
 	printer.key("write time", F32U, t.microseconds());
 
@@ -120,7 +117,7 @@ int main(int argc, char * argv[]){
 	return 0;
 }
 
-bool is_memory_ok(const ConstString & application_path, const DisplayDevice & device){
+bool is_memory_ok(const String & application_path, const DisplayDevice & device){
 	bool result = false;
 
 	DisplayInfo display_info;
@@ -128,9 +125,7 @@ bool is_memory_ok(const ConstString & application_path, const DisplayDevice & de
 
 	display_info = device.get_info();
 	if( display_info.is_valid() ){
-		appfs_info = Appfs::get_info(
-					arg::SourceFilePath(application_path)
-					);
+		appfs_info = Appfs::get_info(application_path);
 		if( appfs_info.ram_size() > display_info.memory_size() + 1024 ){
 			result = true;
 		}
@@ -144,11 +139,11 @@ void show_usage(const Cli & cli){
 	exit(1);
 }
 
-bool draw_scene(const ConstString & source, Display & display, Printer & printer){
+bool draw_scene(const String & source, Display & display, Printer & printer){
 	JsonDocument document;
 	JsonArray array =
 			document.load(
-				arg::SourceFilePath(source)
+				fs::File::Path(source)
 				).to_array();
 
 	if( array.is_empty() ){
@@ -169,17 +164,17 @@ bool draw_scene(const ConstString & source, Display & display, Printer & printer
 		//region applies to all object types
 		DrawingRegion region;
 		region << DrawingPoint(
-						 (object.at(arg::JsonKey("x")).to_integer()),
-						 (object.at(arg::JsonKey("y")).to_integer())
+						 (object.at("x").to_integer()),
+						 (object.at("y").to_integer())
 						 );
 
 		region << DrawingArea(
-						 (object.at(arg::JsonKey("width")).to_integer()),
-						 (object.at(arg::JsonKey("height")).to_integer())
+						 (object.at("width").to_integer()),
+						 (object.at("height").to_integer())
 						 );
 
-		sg_color_t color = object.at(arg::JsonKey("color")).to_integer();
-		String class_value = object.at(arg::JsonKey("class")).to_string();
+		sg_color_t color = object.at("color").to_integer();
+		String class_value = object.at("class").to_string();
 
 		printer.open_object(String().format("[%d]", i));
 		printer.key("class", class_value);
@@ -191,16 +186,18 @@ bool draw_scene(const ConstString & source, Display & display, Printer & printer
 			Rectangle().set_color(color).draw(drawing_attributes + region);
 			t.stop();
 		} else if( class_value == "RoundedRectangle" ){
-			u8 radius = object.at(arg::JsonKey("radius")).to_integer();
+			u8 radius = object.at("radius").to_integer();
 			printer.key("radius", "%d", radius);
 			t.start();
 			RoundedRectangle().set_radius(radius).set_color(color).draw(drawing_attributes + region);
 			t.stop();
 		} else if( class_value == "BarProgress" ){
-			u16 value = object.at(arg::JsonKey("value")).to_integer();
-			u16 maximum = object.at(arg::JsonKey("maximum")).to_integer();
-			sg_color_t background_color = object.at(arg::JsonKey("backgroundColor")).to_integer();
-			u8 border_thickness = object.at(arg::JsonKey("borderThickness")).to_integer();
+			u16 value = object.at("value").to_integer();
+			u16 maximum = object.at("maximum").to_integer();
+			sg_color_t background_color =
+					object.at("backgroundColor").to_integer();
+			u8 border_thickness =
+					object.at("borderThickness").to_integer();
 			printer.key("value", "%d", value);
 			printer.key("maximum", "%d", maximum);
 			printer.key("backgroundColor", "%d", background_color);
